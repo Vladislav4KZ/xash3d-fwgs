@@ -261,6 +261,103 @@ static qboolean Cmd_GetDemoList( const char *s, char *completedname, int length 
 
 /*
 =====================================
+Cmd_GetLanguageList
+
+Prints or complete language
+=====================================
+*/
+static qboolean Cmd_GetLanguageList( const char *s, char *completedname, int length )
+{
+	// search resource/*_<lang>.txt in gamedir only
+	search_t *search;
+	string matchbuf;
+	int i;
+
+	search = FS_Search( "resource/*_*.txt", true, true );
+	if( !search )
+	{
+		// also try scanning gamedir language directories
+		search = FS_Search( "*_*", true, true );
+		if( !search ) return false;
+	}
+
+	// track whether we found english explicitly
+	qboolean foundEnglish = false;
+	for( i = 0; i < search->numfilenames; i++ )
+	{
+		const char *fname = search->filenames[i];
+		const char *base = strrchr( fname, '/' );
+		if( !base ) base = fname; else base++;
+		// look for pattern prefix_token.ext
+		const char *us = strchr( base, '_' );
+		const char *dot = strrchr( base, '.' );
+		if( !us || !dot || us >= dot ) continue;
+		int len = dot - (us + 1);
+		if( len <= 0 || len >= (int)sizeof( matchbuf )) continue;
+		Q_strncpy( matchbuf, us + 1, len + 1 );
+
+			if( !Q_stricmp( matchbuf, "english" )) foundEnglish = true;
+
+		if( !Q_strnicmp( matchbuf, s, Q_strlen( s ) ) )
+		{
+			if( completedname && length ) Q_strncpy( completedname, matchbuf, length );
+			Mem_Free( search );
+			return true;
+		}
+	}
+
+	Mem_Free( search );
+
+	// additionally, scan top-level directories like <gamedir>_<lang> in engine root
+	{
+		search_t *topSearch = FS_Search( "*_*", true, false ); // not restricted to gamedir, look in engine root
+		if( topSearch )
+		{
+			for( i = 0; i < topSearch->numfilenames; i++ )
+			{
+				const char *fname = topSearch->filenames[i];
+				const char *base = strrchr( fname, '/' );
+				if( !base ) base = fname; else base++;
+				// expect gamedir_lang or something_lang
+				const char *us = strchr( base, '_' );
+				if( !us ) continue;
+				const char *langpart = us + 1;
+				// lang may go until dot or end
+				const char *dot = strrchr( base, '.' );
+				const char *end = dot ? dot : base + strlen( base );
+				int len = end - langpart;
+				if( len <= 0 || len >= (int)sizeof( matchbuf ) ) continue;
+				Q_strncpy( matchbuf, langpart, len + 1 );
+
+				// delegate existence check to COM_LanguageExists to avoid duplication
+				if( !COM_LanguageExists( matchbuf ) ) continue;
+
+				if( !Q_strnicmp( matchbuf, s, Q_strlen( s ) ) )
+				{
+					if( completedname && length ) Q_strncpy( completedname, matchbuf, length );
+					Mem_Free( topSearch );
+					return true;
+				}
+			}
+			Mem_Free( topSearch );
+		}
+	}
+
+	// if we didn't find explicit english entry, suggest "english" when input matches 'e' or is empty
+	if( !foundEnglish )
+	{
+		if( Q_strlen( s ) == 0 || !Q_strnicmp( "english", s, Q_strlen( s ) ) )
+		{
+			if( completedname && length ) Q_strncpy( completedname, "english", length );
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/*
+=====================================
 Cmd_GetMovieList
 
 Prints or complete movie filename
@@ -1064,6 +1161,7 @@ static const autocomplete_list_t cmd_list[] =
 { "entpatch", 1, Cmd_GetMapList },
 { "exec", 1, Cmd_GetConfigList },
 { "game", 1, Cmd_GetGamesList },
+{ "language", 1, Cmd_GetLanguageList },
 { "give", 1, Cmd_GetItemsList },
 { "hpkextract", 1, Cmd_GetCustomList },
 { "hpklist", 1, Cmd_GetCustomList },

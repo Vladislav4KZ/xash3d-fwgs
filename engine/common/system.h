@@ -66,7 +66,7 @@ qboolean _Sys_GetParmFromCmdLine( const char *parm, char *out, size_t size );
 qboolean Sys_GetIntFromCmdLine( const char *parm, int *out );
 void Sys_Print( const char *pMsg );
 void Sys_Quit( const char *reason ) NORETURN;
-qboolean Sys_NewInstance( const char *gamedir, const char *finalmsg );
+qboolean Sys_NewInstance( const char *gamedir, const char *language, const char *finalmsg );
 void *Sys_GetNativeObject( const char *obj );
 
 //

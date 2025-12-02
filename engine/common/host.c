@@ -375,7 +375,7 @@ static void Host_NewInstance( const char *name, const char *finalmsg )
 
 	host.change_game = true;
 
-	if( !Sys_NewInstance( name, finalmsg ))
+	if( !Sys_NewInstance( name, NULL, finalmsg ))
 		pChangeGame( name ); // call from hl.exe
 }
 
@@ -417,6 +417,57 @@ static void Host_ChangeGame_f( void )
 
 		Q_snprintf( finalmsg, sizeof( finalmsg ), "change game to '%s'", FI->games[i]->title );
 		Host_NewInstance( Cmd_Argv( 1 ), finalmsg );
+	}
+}
+
+/*
+=================
+Host_Language_f
+restart current game with different language (preserve gamedir)
+usage: language <lang>
+=================
+*/
+static void Host_Language_f( void )
+{
+	if( Cmd_Argc() != 2 )
+	{
+		Con_Printf( S_USAGE "language <lang>\n" );
+		return;
+	}
+
+	const char *lang = Cmd_Argv( 1 );
+	if( !lang || !lang[0] )
+	{
+		Con_Printf( "empty language\n" );
+		return;
+	}
+
+	char finalmsg[MAX_VA_STRING];
+	Q_snprintf( finalmsg, sizeof( finalmsg ), "restart with language '%s'", lang );
+
+	// if requested language already active, do nothing
+	{
+		const char *cur = Cvar_VariableString( "ui_language" );
+		if( cur && cur[0] && !Q_stricmp( cur, lang ))
+		{
+			Con_Printf( "%s language already active\n", lang );
+			return;
+		}
+	}
+
+	// verify that requested language exists: resource/*_<lang>.txt in gamedir or gamedir_<lang> directory
+	{
+		// Use centralized check which covers current gamedir and top-level gamedir_<lang> directories
+		if( !COM_LanguageExists( lang ) )
+		{
+			Con_Printf( "%s language not found\n", lang );
+			return;
+		}
+
+		// set fs_mount_l10n so filesystem will mount l10n resources on next start
+		Cvar_SetValue( "fs_mount_l10n", 1 );
+		// Sys_NewInstance will perform Host_Shutdown and execv
+		Sys_NewInstance( NULL, lang, finalmsg );
 	}
 }
 
@@ -1236,6 +1287,7 @@ int EXPORT Host_Main( int argc, char **argv, const char *progname, int bChangeGa
 	if( pChangeGame != NULL )
 	{
 		Cmd_AddRestrictedCommand( "game", Host_ChangeGame_f, "change game" );
+		Cmd_AddRestrictedCommand( "language", Host_Language_f, "restart current game with specified language" );
 		Cvar_Get( "host_allow_changegame", "1", FCVAR_READ_ONLY, "allows to change games" );
 	}
 	else

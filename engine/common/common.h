@@ -170,6 +170,10 @@ extern convar_t	rcon_password;
 extern convar_t	hpk_custom_file;
 extern convar_t	con_gamemaps;
 
+// check whether localization resources for <lang> exist
+// searches gamedir resource/<prefix>_<lang>.txt and top-level <gamedir>_<lang>/resource/<prefix>_<lang>.txt
+qboolean COM_LanguageExists( const char *lang );
+
 #define Mod_AllowMaterials() ( host_allow_materials.value != 0.0f && !FBitSet( host.features, ENGINE_DISABLE_HDTEXTURES ))
 
 /*

@@ -519,19 +519,22 @@ Sys_ChangeGame
 
 This is a special function
 
-Here we restart engine with new -game parameter
+Here we restart engine with new -game parameter or -language if language is specified,
 but since engine will be unloaded during this call
 it explicitly doesn't use internal allocation or string copy utils
 ==================
 */
-qboolean Sys_NewInstance( const char *gamedir, const char *finalmsg )
+qboolean Sys_NewInstance( const char *gamedir, const char *language, const char *finalmsg )
 {
 #if XASH_NSWITCH
 	char newargs[4096];
 	const char *exe = host.argv[0]; // arg 0 is always the full NRO path
 
 	// TODO: carry over the old args (assuming you can even pass any)
+	if( gamedir )
 	Q_snprintf( newargs, sizeof( newargs ), "%s -game %s", exe, gamedir );
+	else if( language )
+		Q_snprintf( newargs, sizeof( newargs ), "%s -language %s", exe, language );
 	// just restart the entire thing
 	printf( "envSetNextLoad exe: `%s`\n", exe );
 	printf( "envSetNextLoad argv:\n`%s`\n", newargs );
@@ -539,36 +542,66 @@ qboolean Sys_NewInstance( const char *gamedir, const char *finalmsg )
 	envSetNextLoad( exe, newargs );
 	exit( 0 );
 #else
-	int i = 0;
-	qboolean replacedArg = false;
-	size_t exelen;
-	char *exe, **newargs;
+	int newargc = 0;
+	char **newargs = NULL;
+	char *exe = NULL;
 
 	// don't use engine allocation utils here
 	// they will be freed after Host_Shutdown
-	newargs = calloc( host.argc + 4, sizeof( *newargs ));
-	while( i < host.argc )
+	newargs = calloc( host.argc + 8, sizeof( *newargs ));
+	for( int i = 0; i < host.argc; i++ )
 	{
-		newargs[i] = strdup( host.argv[i] );
+		if( host.argv[i] ) newargs[newargc++] = strdup( host.argv[i] );
+	}
 
-		// replace existing -game argument
-		if( !Q_stricmp( newargs[i], "-game" ))
+	// replace existing -game argument
+	if( gamedir )
+	{
+		qboolean replaced = false;
+		for( int i = 0; i < newargc; i++ )
 		{
-			newargs[i + 1] = strdup( gamedir );
-			replacedArg = true;
-			i += 2;
+			if( !Q_stricmp( newargs[i], "-game" ) && i + 1 < newargc )
+			{
+				free( newargs[i + 1] );
+				newargs[i + 1] = strdup( gamedir );
+				replaced = true;
+				break;
+			}
 		}
-		else i++;
+		if( !replaced )
+		{
+			newargs[newargc++] = strdup( "-game" );
+			newargs[newargc++] = strdup( gamedir );
+		}
 	}
 
-	if( !replacedArg )
+	// replace existing -language argument
+	if( language )
 	{
-		newargs[i++] = strdup( "-game" );
-		newargs[i++] = strdup( gamedir );
+		qboolean replaced = false;
+		for( int i = 0; i < newargc; i++ )
+		{
+			if( !Q_stricmp( newargs[i], "-language" ) && i + 1 < newargc )
+			{
+				free( newargs[i + 1] );
+				newargs[i + 1] = strdup( language );
+				replaced = true;
+				break;
+			}
+		}
+		if( !replaced )
+		{
+			newargs[newargc++] = strdup( "-language" );
+			newargs[newargc++] = strdup( language );
+		}
 	}
 
-	newargs[i++] = strdup( "-changegame" );
-	newargs[i] = NULL;
+	// append -changegame marker only when we actually change the game directory.
+	if( gamedir )
+	{
+		newargs[newargc++] = strdup( "-changegame" );
+	}
+	newargs[newargc] = NULL;
 
 #if XASH_PSVITA
 	// under normal circumstances it's always going to be the same path
@@ -576,7 +609,7 @@ qboolean Sys_NewInstance( const char *gamedir, const char *finalmsg )
 	Host_ShutdownWithReason( finalmsg );
 	sceAppMgrLoadExec( exe, newargs, NULL );
 #else
-	exelen = wai_getExecutablePath( NULL, 0, NULL );
+	size_t exelen = wai_getExecutablePath( NULL, 0, NULL );
 	exe = malloc( exelen + 1 );
 	wai_getExecutablePath( exe, exelen, NULL );
 	exe[exelen] = 0;
@@ -589,8 +622,8 @@ qboolean Sys_NewInstance( const char *gamedir, const char *finalmsg )
 	// if execv returned, it's probably an error
 	printf( "execv failed: %s", strerror( errno ));
 
-	for( ; i >= 0; i-- )
-		free( newargs[i] );
+	for( int j = newargc; j >= 0; j-- )
+		free( newargs[j] );
 	free( newargs );
 	free( exe );
 #endif
