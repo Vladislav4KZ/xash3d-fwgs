@@ -80,7 +80,7 @@ static void IN_GyroMap( const vec3_t raw, platform_orientation_t orient, float *
 
 #if XASH_PSVITA
 	// PS Vita mapping: gyro X -> pitch, gyro Y -> yaw.
-	pitch_speed = -orient_scale * sensor[0] * (180.0f / M_PI);
+	pitch_speed = orient_scale * sensor[0] * (180.0f / M_PI);
 	yaw_speed   = orient_scale * sensor[1] * (180.0f / M_PI);
 #else
 	// Android/iOS mapping: gyro Y -> pitch, gyro X -> yaw.
