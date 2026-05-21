@@ -46,6 +46,7 @@ void Test_RunGamma( void );
 void Test_RunDelta( void );
 void Test_RunBuffer( void );
 void Test_RunMunge( void );
+void Test_RunInput( void );
 void Test_RunTitles( void );
 
 #define TEST_LIST_0 \
@@ -60,7 +61,8 @@ void Test_RunTitles( void );
 
 #define TEST_LIST_0_CLIENT \
 	Test_RunCon(); \
-	Test_RunGamma();
+	Test_RunGamma(); \
+	Test_RunInput();
 
 #define TEST_LIST_1 \
 	Test_RunImagelib();
