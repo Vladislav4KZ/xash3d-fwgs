@@ -52,6 +52,7 @@ jobs:
           - os: ubuntu-latest
             targetos: psvita
             targetarch: armv7hf
+            cross: true
           - os: windows-latest
             targetos: win32
             targetarch: amd64
