@@ -14,5 +14,6 @@
 
 	<Preference
 		app:key="crash_logs"
+		app:layout="@layout/item_preference"
 		app:title="@string/crash_logs" />
 </PreferenceScreen>
