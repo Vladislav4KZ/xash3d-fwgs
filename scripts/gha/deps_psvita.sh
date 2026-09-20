@@ -11,6 +11,7 @@ sudo ln -sf /usr/bin/cmake /usr/local/bin/cmake
 echo "Downloading vitasdk..."
 
 export VITASDK=/usr/local/vitasdk
+export PKG_CONFIG_PATH=$VITASDK/arm-vita-eabi/lib/pkgconfig:$VITASDK/arm-vita-eabi/share/pkgconfig
 
 # vdpm is a pacman frontend now, it asks for confirmation unless told otherwise
 export VDPM_NONINTERACTIVE=1
@@ -59,3 +60,7 @@ echo "Downloading HLSDK..."
 
 rm -rf hlsdk-xash3d hlsdk-portable
 git clone --recursive https://github.com/FWGS/hlsdk-portable || exit 1
+
+echo "VITASDK=${VITASDK}" >> "$GITHUB_ENV"
+echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
+echo "PATH=${VITASDK}/bin:${PATH}" >> "$GITHUB_ENV"
