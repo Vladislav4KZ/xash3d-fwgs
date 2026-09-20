@@ -44,6 +44,9 @@ cmake --build build -- -j$JOBS || die
 cmake --install build || die
 popd || die
 
+# Make the installed Vita SDL2 package visible to arm-vita-eabi-pkg-config.
+export PKG_CONFIG_PATH="$VITASDK/arm-vita-eabi/lib/pkgconfig:$VITASDK/arm-vita-eabi/share/pkgconfig"
+
 echo "Building engine..."
 
 ./waf configure -T release --psvita || die_configure
