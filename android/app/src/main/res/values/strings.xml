@@ -14,6 +14,8 @@
 	<string name="preferences_server_package">Server package</string>
 	<string name="preferences_use_icons">Use icons instead of backgrounds</string>
 	<string name="game_data_location">Game data location</string>
+	<string name="game_data_location_unavailable_message">Choose a folder on the device\'s internal storage or a mounted SD card. Cloud providers and app-private folders cannot be used as a game directory.</string>
+	<string name="game_data_location_select_parent">Select the folder that contains game folders (for example, valve or cstrike), not one of the game folders itself.</string>
 	<string name="file_access_required">All-files access required</string>
 	<string name="file_access_message">All-files access is required for the app to function properly.</string>
 	<string name="select_current_directory">Select current directory</string>
