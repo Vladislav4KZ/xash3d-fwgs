@@ -25,13 +25,19 @@ class GameAdapter(private val libraryViewModel: LibraryViewModel) :
 		return holder.bind(getItem(position))
 	}
 
+	fun gameAt(position: Int): Game = getItem(position)
+
+	// The same game data location usually yields the same set of games, but
+	// picking a different one can produce a list where every game shares its
+	// directory name with a game from the previous location. Compare by the
+	// full path, or the recycled cards keep the stale click handlers.
 	private class DiffCallback : DiffUtil.ItemCallback<Game>() {
 		override fun areItemsTheSame(oldItem: Game, newItem: Game): Boolean {
-			return oldItem.basedir.name == newItem.basedir.name
+			return oldItem.basedir == newItem.basedir
 		}
 
 		override fun areContentsTheSame(oldItem: Game, newItem: Game): Boolean {
-			return oldItem.basedir.name == newItem.basedir.name
+			return oldItem.basedir == newItem.basedir && oldItem.title == newItem.title
 		}
 
 	}
@@ -55,16 +61,41 @@ class GameAdapter(private val libraryViewModel: LibraryViewModel) :
 				}
 
 				settingsButton.setOnClickListener {
-					libraryViewModel.setSelectedGame(game)
+					val game = currentGame()
+
+					if (game != null) {
+						libraryViewModel.setSelectedGame(game)
+					}
+
 					it.findNavController()
 						.navigate(R.id.action_libraryFragment_to_gameSettingsFragment)
 				}
 
-				root.setOnClickListener { libraryViewModel.startEngine(it.context, game) }
-				launchButton.setOnClickListener {
-					libraryViewModel.startEngine(it.context, game)
-				}
+				root.setOnClickListener { launchEngine() }
+				launchButton.setOnClickListener { launchEngine() }
 			}
+		}
+
+		// Resolve the game at click time: the card is rebound only when DiffUtil
+		// sees a change, so a Game captured in bind() may already be stale.
+		private fun launchEngine() {
+			val game = currentGame()
+
+			if (game != null) {
+				libraryViewModel.startEngine(itemView.context, game)
+			}
+		}
+
+		// adapterPosition rather than bindingAdapterPosition: the latter needs
+		// androidx.recyclerview 1.2, while the app resolves an older version.
+		private fun currentGame(): Game? {
+			val position = adapterPosition
+
+			if (position == RecyclerView.NO_POSITION) {
+				return null
+			}
+
+			return gameAt(position)
 		}
 	}
 }
