@@ -6,11 +6,14 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.core.net.toUri
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import su.xash.engine.R
 import su.xash.engine.XashActivity
@@ -18,7 +21,17 @@ import su.xash.engine.util.showDownloadProgressDialog
 import java.io.File
 import java.io.FileInputStream
 
-class Game(val ctx: Context, val basedir: File, val gameInfoFile: File) {
+/**
+ * @param previous the same game from an earlier scan, if any. Its decoded icon
+ * and cover are reused when the files they were built from did not change,
+ * including the outcome that there is nothing to show.
+ */
+class Game(
+	val ctx: Context,
+	val basedir: File,
+	val gameInfoFile: File,
+	previous: Game? = null
+) {
 	private var iconName = "game.ico"
 	var title = "Unknown Game"
 	var icon: Bitmap? = null
@@ -43,23 +56,38 @@ class Game(val ctx: Context, val basedir: File, val gameInfoFile: File) {
 		parseGameInfo(gameInfoFile)
 
 		val iconFile = File(basedir, iconName)
-		iconSignature = if (iconFile.isFile) {
+		val iconSig = if (iconFile.isFile) {
 			"${iconFile.absolutePath}:${iconFile.length()}:${iconFile.lastModified()}"
 		} else {
 			null
 		}
-		if (iconFile.exists()) {
-			icon = BitmapFactory.decodeFile(iconFile.path)
+		iconSignature = iconSig
+		if (iconSig != null) {
+			icon = if (previous != null && previous.iconSignature == iconSig) {
+				previous.icon
+			} else {
+				BitmapFactory.decodeFile(iconFile.path)
+			}
 		}
 
-		var backgroundSignature: String? = null
-		try {
-			backgroundSignature = BackgroundBitmap.getBackgroundSignature(basedir)
-			cover = BackgroundBitmap.createBackground(basedir)
+		val coverSig = try {
+			BackgroundBitmap.getBackgroundSignature(basedir)
 		} catch (e: Exception) {
-			e.printStackTrace()
+			Log.w(TAG, "Failed to fingerprint the background of $basedir", e)
+			null
 		}
-		coverSignature = backgroundSignature
+		coverSignature = coverSig
+		cover = if (coverSig != null && previous != null && previous.coverSignature == coverSig) {
+			previous.cover
+		} else {
+			try {
+				BackgroundBitmap.createBackground(basedir)
+			} catch (e: Exception) {
+				// Most mods have no background tiles at all, this is not an error.
+				Log.d(TAG, "No background for $basedir: ${e.message}")
+				null
+			}
+		}
 	}
 
 	fun startEngine(ctx: Context) {
@@ -235,15 +263,28 @@ class Game(val ctx: Context, val basedir: File, val gameInfoFile: File) {
 	}
 
 	companion object {
-		fun getGames(ctx: Context, root: File): List<Game> {
+		private const val TAG = "Game"
+
+		/**
+		 * Lists the games below [root]. Bitmaps of games from [previous] whose
+		 * artwork did not change are reused instead of being decoded again.
+		 * A game directory that fails to load is skipped, it does not take the
+		 * whole library down with it.
+		 */
+		suspend fun getGames(ctx: Context, root: File, previous: List<Game> = emptyList()): List<Game> {
+			val known = previous.associateBy { it.basedir }
 			val games = mutableListOf<Game>()
 
-			root.listFiles()?.forEach {
-				if (it.isDirectory) {
-					val subDirGameInfoFile = checkIfGamedir(it)
-					if (subDirGameInfoFile != null) {
-						games.add(Game(ctx, it, subDirGameInfoFile))
-					}
+			for (dir in root.listFiles().orEmpty()) {
+				currentCoroutineContext().ensureActive()
+
+				if (!dir.isDirectory) continue
+				val gameInfoFile = checkIfGamedir(dir) ?: continue
+
+				try {
+					games.add(Game(ctx, dir, gameInfoFile, known[dir]))
+				} catch (e: Exception) {
+					Log.w(TAG, "Skipping game directory $dir", e)
 				}
 			}
 

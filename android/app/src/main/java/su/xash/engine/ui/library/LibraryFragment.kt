@@ -35,28 +35,18 @@ class LibraryFragment : Fragment(), MenuProvider {
 
 	private val libraryViewModel: LibraryViewModel by activityViewModels()
 
-	private val startActivityForResult =
-		registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-			if (checkStoragePermissions()) {
-				libraryViewModel.reloadGames(requireContext())
-			}
-		}
+	// Whether the view was created since the fragment was last started.
+	private var viewCreatedBeforeStart = false
 
 	private val requiredPermissions = arrayOf(
 		Manifest.permission.READ_EXTERNAL_STORAGE,
 		Manifest.permission.WRITE_EXTERNAL_STORAGE
 	)
 
+	// The outcome is picked up by onResume, which checks the permissions again.
 	private val requestPermissionLauncher = registerForActivityResult(
 		ActivityResultContracts.RequestMultiplePermissions()
-	) { permissions ->
-		val granted = permissions.entries.all { it.value }
-		if (granted) {
-			libraryViewModel.reloadGames(requireContext())
-		} else {
-			checkStoragePermissions()
-		}
-	}
+	) { }
 
 	private fun checkStoragePermissions(): Boolean {
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -65,7 +55,7 @@ class LibraryFragment : Fragment(), MenuProvider {
 					setTitle(R.string.file_access_required)
 					setMessage(R.string.file_access_message)
 					setPositiveButton(R.string.open_settings) { _, _ ->
-						startActivityForResult.launch(
+						startActivity(
 							Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).setData(
 								Uri.fromParts("package", BuildConfig.APPLICATION_ID, null)
 							)
@@ -140,7 +130,9 @@ class LibraryFragment : Fragment(), MenuProvider {
 	}
 
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-		binding.swipeRefresh.setOnRefreshListener { libraryViewModel.reloadGames(requireContext()) }
+		viewCreatedBeforeStart = true
+
+		binding.swipeRefresh.setOnRefreshListener { libraryViewModel.reloadGames() }
 
 		libraryViewModel.isReloading.observe(viewLifecycleOwner) {
 			binding.swipeRefresh.isRefreshing = it
@@ -148,10 +140,6 @@ class LibraryFragment : Fragment(), MenuProvider {
 
 		libraryViewModel.installedGames.observe(viewLifecycleOwner) {
 			(binding.gamesList.adapter as GameAdapter).submitList(it)
-		}
-
-		if (checkStoragePermissions()) {
-			libraryViewModel.reloadGames(requireContext())
 		}
 	}
 
@@ -174,11 +162,26 @@ class LibraryFragment : Fragment(), MenuProvider {
 		return false
 	}
 
+	override fun onStart() {
+		super.onStart()
+
+		// Started without a new view means the app came back from the background,
+		// e.g. from a file manager the games were copied with. Coming back from
+		// the settings or a configuration change creates a new view instead,
+		// nothing can have changed behind our back there.
+		if (!viewCreatedBeforeStart) {
+			libraryViewModel.markGamesStale()
+		}
+		viewCreatedBeforeStart = false
+	}
+
 	override fun onResume() {
 		super.onResume()
 
+		// Also runs when coming back from the settings, where the game data
+		// location may have been changed, so only scan when that is the case.
 		if (checkStoragePermissions()) {
-			libraryViewModel.reloadGames(requireContext())
+			libraryViewModel.reloadGamesIfNeeded()
 		}
 	}
 }
