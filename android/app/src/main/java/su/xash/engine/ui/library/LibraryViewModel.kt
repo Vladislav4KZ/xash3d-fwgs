@@ -3,11 +3,15 @@ package su.xash.engine.ui.library
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import su.xash.engine.model.Game
@@ -28,24 +32,91 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 	private val appPreferences: SharedPreferences =
 		application.getSharedPreferences(Prefs.APP_PREFERENCES, Context.MODE_PRIVATE)
 
-	fun reloadGames(ctx: Context) {
-		if (isReloading.value == true) {
-			return
+	// Only one scan runs at a time; a new scan cancels the previous one
+	private var scanJob: Job? = null
+
+	// Root path of the running scan, or null when idle
+	private var scanningRootPath: String? = null
+
+	// Root path of the last completed scan, including failed scans
+	private var scannedRootPath: String? = null
+
+	private fun currentGameRootPath(): String =
+		appPreferences.getString(Prefs.GAME_PATH, null)
+			?: Prefs.defaultGamePath.absolutePath
+
+	// Reloads the library if the selected game data location changed
+	fun reloadGamesIfNeeded() {
+		val rootPath = currentGameRootPath()
+
+		when {
+			rootPath == scanningRootPath -> return
+			rootPath != scannedRootPath -> startScan(rootPath)
+			else -> cancelScan() // a scan of some other root is obsolete now
 		}
+	}
+
+	// Reloads the library unless a scan of the same location is already running
+	fun reloadGames() {
+		val rootPath = currentGameRootPath()
+
+		if (rootPath != scanningRootPath) {
+			startScan(rootPath)
+		}
+	}
+
+	private fun cancelScan() {
+		val job = scanJob ?: return
+
+		job.cancel()
+		scanJob = null
+		scanningRootPath = null
+		_isReloading.value = false
+	}
+
+	private fun startScan(rootPath: String) {
+		scanJob?.cancel()
+		scanningRootPath = rootPath
 		_isReloading.value = true
 
-		viewModelScope.launch {
-			withContext(Dispatchers.IO) {
-				val rootPath = appPreferences.getString(Prefs.GAME_PATH, null)
-					?: Prefs.defaultGamePath.absolutePath
-				val root = File(rootPath)
+		// The scan outlives the fragment that asked for it, so it must not
+		// hold on to an Activity context through the Game objects.
+		val appContext = getApplication<Application>()
+		val previousGames = _installedGames.value.orEmpty()
 
-				Nomedia.ensureNomedia(root)
+		val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+			val games = try {
+				withContext(Dispatchers.IO) {
+					val root = File(rootPath)
 
-				_installedGames.postValue(Game.getGames(ctx, root))
-				_isReloading.postValue(false)
+					if (!Nomedia.ensureNomedia(root)) {
+						Log.w(TAG, "Cannot create .nomedia in $rootPath")
+					}
+
+					Game.getGames(appContext, root, previousGames)
+				}
+			} catch (e: CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				Log.e(TAG, "Failed to scan $rootPath", e)
+				null
 			}
+
+			if (games != null) {
+				_installedGames.value = games
+			} else if (scannedRootPath != rootPath) {
+				// Clear games from another location, but keep the current list on refresh failure
+				_installedGames.value = emptyList()
+			}
+			scannedRootPath = rootPath
+
+			scanJob = null
+			scanningRootPath = null
+			_isReloading.value = false
 		}
+
+		scanJob = job
+		job.start()
 	}
 
 	fun setSelectedGame(game: Game) {
@@ -54,5 +125,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
 	fun startEngine(ctx: Context, game: Game) {
 		game.startEngine(ctx)
+	}
+
+	private companion object {
+		const val TAG = "LibraryViewModel"
 	}
 }
