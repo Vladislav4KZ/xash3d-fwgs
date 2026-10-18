@@ -23,6 +23,8 @@ class Game(val ctx: Context, val basedir: File, val gameInfoFile: File) {
 	var title = "Unknown Game"
 	var icon: Bitmap? = null
 	var cover: Bitmap? = null
+	val iconSignature: String?
+	val coverSignature: String?
 
 	val mobileHacksGames = arrayOf("aom", "bdlands", "biglolly", "bshift", "caseclosed",
 		"hl_urbicide", "induction", "redempt", "secret",
@@ -41,15 +43,23 @@ class Game(val ctx: Context, val basedir: File, val gameInfoFile: File) {
 		parseGameInfo(gameInfoFile)
 
 		val iconFile = File(basedir, iconName)
+		iconSignature = if (iconFile.isFile) {
+			"${iconFile.absolutePath}:${iconFile.length()}:${iconFile.lastModified()}"
+		} else {
+			null
+		}
 		if (iconFile.exists()) {
 			icon = BitmapFactory.decodeFile(iconFile.path)
 		}
 
+		var backgroundSignature: String? = null
 		try {
+			backgroundSignature = BackgroundBitmap.getBackgroundSignature(basedir)
 			cover = BackgroundBitmap.createBackground(basedir)
 		} catch (e: Exception) {
 			e.printStackTrace()
 		}
+		coverSignature = backgroundSignature
 	}
 
 	fun startEngine(ctx: Context) {

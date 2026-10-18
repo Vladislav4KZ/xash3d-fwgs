@@ -135,6 +135,8 @@ dependencies {
 	implementation(libs.navigation.fragment.ktx)
 	implementation(libs.navigation.ui.ktx)
 	implementation(libs.preference.ktx)
+	// bindingAdapterPosition needs 1.2, the libraries above bring in 1.0
+	implementation(libs.recyclerview)
 	implementation(libs.swiperefreshlayout)
 
 	implementation(libs.acra.http)

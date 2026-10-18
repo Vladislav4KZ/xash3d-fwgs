@@ -14,6 +14,55 @@ object BackgroundBitmap {
 	private const val BACKGROUND_WIDTH = 800
 	private const val BACKGROUND_HEIGHT = 600
 
+	/**
+	 * Fingerprint the files used to build the background without decoding them.
+	 * The game list uses this to detect changed artwork across library scans.
+	 */
+	fun getBackgroundSignature(file: File): String {
+		val sources = mutableListOf<File>()
+		val resourceFolder = File(file, "resource")
+		var bgLayout = File(resourceFolder, "HD_BackgroundLayout.txt")
+		if (!bgLayout.exists()) {
+			bgLayout = File(resourceFolder, "BackgroundLayout.txt")
+		}
+
+		if (!bgLayout.exists()) {
+			val dir = File(resourceFolder, "background")
+			for (i in 0 until BACKGROUND_ROWS) {
+				for (j in 0 until BACKGROUND_COLUMNS) {
+					val filename = "${BACKGROUND_WIDTH}_${i + 1}_${'a' + j}_loading.tga"
+					sources.add(File(dir, filename))
+				}
+			}
+		} else {
+			sources.add(bgLayout)
+			FileInputStream(bgLayout).use { inputStream ->
+				Scanner(inputStream).use { scanner ->
+					while (scanner.hasNext()) {
+						when (val str = scanner.next()) {
+							"resolution" -> {
+								scanner.nextInt()
+								scanner.nextInt()
+							}
+							else -> {
+								scanner.next()
+								scanner.nextInt()
+								scanner.nextInt()
+								var bmpFile = file
+								str.split("/").forEach { bmpFile = File(bmpFile, it) }
+								sources.add(bmpFile)
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return sources.joinToString("|") {
+			"${it.absolutePath}:${it.exists()}:${it.length()}:${it.lastModified()}"
+		}
+	}
+
 	fun createBackground(file: File): Bitmap {
 		var bitmap =
 			Bitmap.createBitmap(BACKGROUND_WIDTH, BACKGROUND_HEIGHT, Bitmap.Config.ARGB_8888)
