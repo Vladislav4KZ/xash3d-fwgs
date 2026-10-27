@@ -58,8 +58,10 @@ class LibraryFragment : Fragment(), MenuProvider {
 							)
 						)
 					}
-					setNeutralButton(R.string.done_check_permissions) { dialog, _ ->
-						checkStoragePermissions()
+					setNeutralButton(R.string.done_check_permissions) { _, _ ->
+						if (checkStoragePermissions()) {
+							libraryViewModel.reloadGames()
+						}
 					}
 					setCancelable(false)
 					show()
@@ -98,7 +100,9 @@ class LibraryFragment : Fragment(), MenuProvider {
 						}
 					}
 					setNeutralButton(R.string.done_check_permissions) { _, _ ->
-						checkStoragePermissions()
+						if (checkStoragePermissions()) {
+							libraryViewModel.reloadGames()
+						}
 					}
 					setCancelable(false)
 					show()
