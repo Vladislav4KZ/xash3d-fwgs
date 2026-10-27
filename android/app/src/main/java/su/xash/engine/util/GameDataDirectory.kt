@@ -31,7 +31,10 @@ object GameDataDirectory {
 	sealed class Result {
 		data class Success(val directory: File, val insideMediaDirectory: Boolean) : Result()
 
-		sealed class Failure(val messageRes: Int) : Result() {
+		sealed class Failure(
+			val messageRes: Int,
+			val formatArgs: List<Any> = emptyList()
+		) : Result() {
 			object NotLocalStorage :
 				Failure(R.string.game_data_location_not_local_storage)
 
@@ -62,6 +65,12 @@ object GameDataDirectory {
 
 			object MediaContent :
 				Failure(R.string.game_data_location_media_content)
+
+			// Before Android 11 only the app directory is writable there
+			class RemovableStorageRestricted(appDirectory: File) : Failure(
+				R.string.game_data_location_removable_restricted,
+				listOf(appDirectory.path)
+			)
 		}
 	}
 
@@ -95,11 +104,6 @@ object GameDataDirectory {
 			relativePath = if (relativePath.isEmpty()) HOME_DIRECTORY else "$HOME_DIRECTORY/$relativePath"
 		}
 
-		if (relativePath.isEmpty())
-			return Result.Failure.VolumeRoot
-		if (relativePath.split('/').any { it.isEmpty() || it == "." || it == ".." })
-			return Result.Failure.InvalidPath
-
 		val volumeRoot = try {
 			findVolumeRoot(context, volumeId)?.canonicalFile
 		} catch (e: IOException) {
@@ -109,6 +113,30 @@ object GameDataDirectory {
 
 		if (!volumeRoot.isDirectory)
 			return Result.Failure.VolumeUnavailable
+
+		// Before Android 11 SD cards and USB drives are writable only in Android/data/<package>
+		val restrictedDirectory = if (
+			Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&
+			!volumeId.equals(PRIMARY_VOLUME_ID, ignoreCase = true)
+		) {
+			try {
+				File(volumeRoot, "Android/data/${context.packageName}").canonicalFile
+			} catch (e: IOException) {
+				Log.w(TAG, "Failed to canonicalize the app directory of \"$volumeRoot\"", e)
+				return Result.Failure.InvalidPath
+			}
+		} else {
+			null
+		}
+
+		if (relativePath.isEmpty()) {
+			return if (restrictedDirectory != null)
+				Result.Failure.RemovableStorageRestricted(restrictedDirectory)
+			else
+				Result.Failure.VolumeRoot
+		}
+		if (relativePath.split('/').any { it.isEmpty() || it == "." || it == ".." })
+			return Result.Failure.InvalidPath
 
 		val directory = try {
 			File(volumeRoot, relativePath).canonicalFile
@@ -123,6 +151,12 @@ object GameDataDirectory {
 
 		if (!directory.isDirectory || !directory.canRead())
 			return Result.Failure.NotADirectory
+
+		if (restrictedDirectory != null &&
+			directory != restrictedDirectory &&
+			!directory.path.startsWith(restrictedDirectory.path + File.separator)
+		)
+			return Result.Failure.RemovableStorageRestricted(restrictedDirectory)
 
 		// Use the resolved path, not the document id
 		val topLevelName = directory.path
@@ -162,7 +196,13 @@ object GameDataDirectory {
 			return volume.directory
 		}
 
-		// Before Android 11, removable volumes are exposed under /storage/<UUID>.
-		return File("/storage", volumeId)
+		// No StorageVolume.getDirectory() before Android 11, use the app directories
+		val marker = "/Android/data/"
+		val mounted = context.getExternalFilesDirs(null).filterNotNull().mapNotNull {
+			val index = it.path.indexOf(marker)
+			if (index > 0) File(it.path.substring(0, index)) else null
+		}.firstOrNull { it.name.equals(volumeId, ignoreCase = true) }
+
+		return mounted ?: File("/storage", volumeId)
 	}
 }

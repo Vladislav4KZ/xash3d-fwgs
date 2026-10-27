@@ -94,7 +94,7 @@ class AppSettingsPreferenceFragment() : PreferenceFragmentCompat() {
 			val success = when (result) {
 				is Result.Success -> result
 				is Result.Failure -> {
-					showGameDirectoryError(result.messageRes)
+					showGameDirectoryError(result.messageRes, *result.formatArgs.toTypedArray())
 					return@launch
 				}
 			}
@@ -204,11 +204,17 @@ class AppSettingsPreferenceFragment() : PreferenceFragmentCompat() {
 		super.onDestroyView()
 	}
 
-	private fun showGameDirectoryError(messageRes: Int) {
+	private fun showGameDirectoryError(messageRes: Int, vararg formatArgs: Any) {
+		val message = if (formatArgs.isEmpty()) {
+			getString(messageRes)
+		} else {
+			getString(messageRes, *formatArgs)
+		}
+
 		showDialog(
 			MaterialAlertDialogBuilder(requireContext())
 				.setTitle(R.string.game_data_location)
-				.setMessage(messageRes)
+				.setMessage(message)
 				.setPositiveButton(android.R.string.ok, null)
 		)
 	}
