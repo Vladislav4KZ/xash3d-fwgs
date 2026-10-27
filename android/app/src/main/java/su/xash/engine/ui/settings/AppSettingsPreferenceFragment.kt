@@ -119,24 +119,33 @@ class AppSettingsPreferenceFragment() : PreferenceFragmentCompat() {
 			}
 
 			when {
-				contents.hasGames -> saveGamePath(directory, requestId)
-				// .nomedia would hide this directory's contents from media apps
-				success.insideMediaDirectory && !contents.isEmpty ->
+				// .nomedia would hide the other files, so check this before hasGames
+				success.insideMediaDirectory && contents.hasOtherContent ->
 					showGameDirectoryError(R.string.game_data_location_media_content)
+				contents.hasGames -> saveGamePath(directory, requestId)
 				else -> confirmGamePathWithoutGames(directory, requestId)
 			}
 		}
 	}
 
-	private class DirectoryContents(val hasGames: Boolean, val isEmpty: Boolean)
+	// hasOtherContent: anything but game directories
+	private class DirectoryContents(val hasGames: Boolean, val hasOtherContent: Boolean)
 
 	// Returns null if the directory cannot be listed
 	private fun inspectGameDirectory(directory: File): DirectoryContents? = try {
 		directory.listFiles()?.let { entries ->
-			DirectoryContents(
-				hasGames = entries.any { it.isDirectory && Game.checkIfGamedir(it) != null },
-				isEmpty = entries.isEmpty()
-			)
+			var hasGames = false
+			var hasOtherContent = false
+
+			for (entry in entries) {
+				if (entry.isDirectory && Game.checkIfGamedir(entry) != null) {
+					hasGames = true
+				} else if (entry.name != ".nomedia") {
+					hasOtherContent = true
+				}
+			}
+
+			DirectoryContents(hasGames, hasOtherContent)
 		}
 	} catch (e: SecurityException) {
 		null
