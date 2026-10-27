@@ -160,9 +160,9 @@ class LibraryFragment : Fragment(), MenuProvider {
 	override fun onResume() {
 		super.onResume()
 
-		// Reload only if the game data location changed in settings
+		// Games could be added with a file manager
 		if (checkStoragePermissions()) {
-			libraryViewModel.reloadGamesIfNeeded()
+			libraryViewModel.reloadGames()
 		}
 	}
 }

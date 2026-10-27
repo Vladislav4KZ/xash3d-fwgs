@@ -2,7 +2,6 @@ package su.xash.engine.ui.library
 
 import android.app.Application
 import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
@@ -29,9 +28,6 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 	val selectedItem: LiveData<Game> get() = _selectedItem
 	private val _selectedItem = MutableLiveData<Game>()
 
-	private val appPreferences: SharedPreferences =
-		application.getSharedPreferences(Prefs.APP_PREFERENCES, Context.MODE_PRIVATE)
-
 	// Only one scan runs at a time; a new scan cancels the previous one
 	private var scanJob: Job? = null
 
@@ -41,37 +37,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 	// Root path of the last completed scan, including failed scans
 	private var scannedRootPath: String? = null
 
-	private fun currentGameRootPath(): String =
-		appPreferences.getString(Prefs.GAME_PATH, null)
-			?: Prefs.defaultGamePath.absolutePath
-
-	// Reloads the library if the selected game data location changed
-	fun reloadGamesIfNeeded() {
-		val rootPath = currentGameRootPath()
-
-		when {
-			rootPath == scanningRootPath -> return
-			rootPath != scannedRootPath -> startScan(rootPath)
-			else -> cancelScan() // a scan of some other root is obsolete now
-		}
-	}
-
-	// Reloads the library unless a scan of the same location is already running
+	// Rescans unless a scan of the same location is already running
 	fun reloadGames() {
-		val rootPath = currentGameRootPath()
+		val rootPath = Prefs.getGamePath(getApplication<Application>()).absolutePath
 
 		if (rootPath != scanningRootPath) {
 			startScan(rootPath)
 		}
-	}
-
-	private fun cancelScan() {
-		val job = scanJob ?: return
-
-		job.cancel()
-		scanJob = null
-		scanningRootPath = null
-		_isReloading.value = false
 	}
 
 	private fun startScan(rootPath: String) {
