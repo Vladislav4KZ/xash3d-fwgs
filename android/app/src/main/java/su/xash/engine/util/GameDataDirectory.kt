@@ -124,7 +124,11 @@ object GameDataDirectory {
 		if (!directory.isDirectory || !directory.canRead())
 			return Result.Failure.NotADirectory
 
-		val topLevelName = relativePath.substringBefore('/').lowercase()
+		// Use the resolved path, not the document id
+		val topLevelName = directory.path
+			.substring(volumeRoot.path.length + 1)
+			.substringBefore(File.separatorChar)
+			.lowercase()
 		val insideMediaDirectory = topLevelName in STANDARD_MEDIA_DIRECTORIES
 		if (insideMediaDirectory && directory.parentFile == volumeRoot)
 			return Result.Failure.MediaDirectory
