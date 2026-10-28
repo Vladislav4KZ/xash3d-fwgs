@@ -167,10 +167,20 @@ object GameDataDirectory {
 		if (insideMediaDirectory && directory.parentFile == volumeRoot)
 			return Result.Failure.MediaDirectory
 
-		if (!directory.canWrite())
+		if (!canWriteTo(directory))
 			return Result.Failure.ReadOnly
 
 		return Result.Success(directory, insideMediaDirectory)
+	}
+
+	// canWrite() doesn't say what the filesystem really allows, so create a file
+	private fun canWriteTo(directory: File): Boolean = try {
+		File.createTempFile(".write_test", null, directory).delete()
+		true
+	} catch (e: IOException) {
+		false
+	} catch (e: SecurityException) {
+		false
 	}
 
 	private fun hasStorageAccess(context: Context): Boolean {
