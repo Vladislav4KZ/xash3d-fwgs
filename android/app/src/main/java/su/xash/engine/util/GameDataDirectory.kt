@@ -63,9 +63,6 @@ object GameDataDirectory {
 			object MediaDirectory :
 				Failure(R.string.game_data_location_media_directory)
 
-			object RemovableStorageUnsupported :
-				Failure(R.string.game_data_location_removable_unsupported)
-
 			// Before Android 11 only the app files directory is writable there
 			class RemovableStorageRestricted(appDirectory: File) : Failure(
 				R.string.game_data_location_removable_restricted,
@@ -121,7 +118,6 @@ object GameDataDirectory {
 		) {
 			try {
 				appFilesDirectory(context, volumeRoot)
-					?: return Result.Failure.RemovableStorageUnsupported
 			} catch (e: IOException) {
 				Log.w(TAG, "Failed to canonicalize the app directory of \"$volumeRoot\"", e)
 				return Result.Failure.InvalidPath
@@ -173,11 +169,14 @@ object GameDataDirectory {
 		return Result.Success(directory)
 	}
 
-	// App files directory on the volume, null if the system doesn't provide one
-	private fun appFilesDirectory(context: Context, volumeRoot: File): File? =
-		context.getExternalFilesDirs(null).filterNotNull().firstOrNull {
+	// App files directory on the volume, the only place to write on removable storage
+	private fun appFilesDirectory(context: Context, volumeRoot: File): File {
+		val directory = context.getExternalFilesDirs(null).filterNotNull().firstOrNull {
 			it.canonicalFile.path.startsWith(volumeRoot.path + File.separator)
-		}?.canonicalFile
+		} ?: File(volumeRoot, "Android/data/${context.packageName}/files")
+
+		return directory.canonicalFile
+	}
 
 	// canWrite() doesn't say what the filesystem really allows, so write a file
 	private fun canWriteTo(directory: File): Boolean {
