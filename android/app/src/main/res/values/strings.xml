@@ -23,6 +23,7 @@
 	<string name="game_data_location_media_directory">Standard media folders such as DCIM, Pictures, Movies or Music cannot be used: a .nomedia marker file is created in the game data location, which would hide the contents of the folder from gallery and media player apps. Choose or create a separate folder for the games, for example in the root of the storage, and select it instead.</string>
 	<string name="game_data_location_media_content">This folder is inside a media folder (such as DCIM, Pictures or Music) and contains other files. Using it would hide them from gallery and media player apps. Choose a separate folder for the games outside the media folders, for example in the root of the storage.</string>
 	<string name="game_data_location_removable_restricted">On Android 10 and older, apps can only write to their own folder on an SD card or USB drive. Select a folder inside %1$s, or use the internal storage.</string>
+	<string name="game_data_location_removable_unsupported">On Android 10 and older, this storage can't be used for game data, as the system doesn't provide an app folder on it. Use the internal storage.</string>
 	<string name="game_data_location_unreadable">The contents of this folder cannot be read.</string>
 	<string name="game_data_location_picker_unavailable">This device has no system folder picker.</string>
 	<string name="game_data_location_select_parent">Select the folder that contains game folders (for example, valve or cstrike), not one of the game folders itself.</string>
