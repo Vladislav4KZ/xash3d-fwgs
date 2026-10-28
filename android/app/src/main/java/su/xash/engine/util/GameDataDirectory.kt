@@ -21,15 +21,15 @@ object GameDataDirectory {
 	private const val HOME_ROOT_ID = "home"
 	private const val HOME_DIRECTORY = "Documents"
 
-	// Android media directories cannot be game roots, as .nomedia would hide
-	// their contents from media apps.
+	// Media directories and everything inside them cannot be game roots,
+	// as .nomedia would hide their contents from media apps.
 	private val STANDARD_MEDIA_DIRECTORIES = setOf(
 		"alarms", "audiobooks", "dcim", "download", "movies", "music",
 		"notifications", "pictures", "podcasts", "recordings", "ringtones"
 	)
 
 	sealed class Result {
-		data class Success(val directory: File, val insideMediaDirectory: Boolean) : Result()
+		data class Success(val directory: File) : Result()
 
 		sealed class Failure(
 			val messageRes: Int,
@@ -62,9 +62,6 @@ object GameDataDirectory {
 
 			object MediaDirectory :
 				Failure(R.string.game_data_location_media_directory)
-
-			object MediaContent :
-				Failure(R.string.game_data_location_media_content)
 
 			object RemovableStorageUnsupported :
 				Failure(R.string.game_data_location_removable_unsupported)
@@ -167,14 +164,13 @@ object GameDataDirectory {
 			.substring(volumeRoot.path.length + 1)
 			.substringBefore(File.separatorChar)
 			.lowercase()
-		val insideMediaDirectory = topLevelName in STANDARD_MEDIA_DIRECTORIES
-		if (insideMediaDirectory && directory.parentFile == volumeRoot)
+		if (topLevelName in STANDARD_MEDIA_DIRECTORIES)
 			return Result.Failure.MediaDirectory
 
 		if (!canWriteTo(directory))
 			return Result.Failure.ReadOnly
 
-		return Result.Success(directory, insideMediaDirectory)
+		return Result.Success(directory)
 	}
 
 	// App files directory on the volume, null if the system doesn't provide one

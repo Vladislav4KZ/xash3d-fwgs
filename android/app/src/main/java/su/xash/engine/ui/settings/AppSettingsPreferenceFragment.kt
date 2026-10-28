@@ -111,42 +111,20 @@ class AppSettingsPreferenceFragment() : PreferenceFragmentCompat() {
 				return@launch
 			}
 
-			val contents = withContext(Dispatchers.IO) { inspectGameDirectory(directory) }
+			val hasGames = withContext(Dispatchers.IO) { hasGameDirectories(directory) }
 			if (requestId != gameDirectoryRequestId) return@launch
-			if (contents == null) {
-				showGameDirectoryError(R.string.game_data_location_unreadable)
-				return@launch
-			}
 
-			when {
-				// .nomedia would hide the other files, so check this before hasGames
-				success.insideMediaDirectory && contents.hasOtherContent ->
-					showGameDirectoryError(R.string.game_data_location_media_content)
-				contents.hasGames -> saveGamePath(directory, requestId)
-				else -> confirmGamePathWithoutGames(directory, requestId)
+			when (hasGames) {
+				null -> showGameDirectoryError(R.string.game_data_location_unreadable)
+				true -> saveGamePath(directory, requestId)
+				false -> confirmGamePathWithoutGames(directory, requestId)
 			}
 		}
 	}
 
-	// hasOtherContent: anything but game directories
-	private class DirectoryContents(val hasGames: Boolean, val hasOtherContent: Boolean)
-
 	// Returns null if the directory cannot be listed
-	private fun inspectGameDirectory(directory: File): DirectoryContents? = try {
-		directory.listFiles()?.let { entries ->
-			var hasGames = false
-			var hasOtherContent = false
-
-			for (entry in entries) {
-				if (entry.isDirectory && Game.checkIfGamedir(entry) != null) {
-					hasGames = true
-				} else if (entry.name != ".nomedia") {
-					hasOtherContent = true
-				}
-			}
-
-			DirectoryContents(hasGames, hasOtherContent)
-		}
+	private fun hasGameDirectories(directory: File): Boolean? = try {
+		directory.listFiles()?.any { it.isDirectory && Game.checkIfGamedir(it) != null }
 	} catch (e: SecurityException) {
 		null
 	}
