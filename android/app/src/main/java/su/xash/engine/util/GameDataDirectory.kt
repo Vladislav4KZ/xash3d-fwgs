@@ -182,14 +182,22 @@ object GameDataDirectory {
 		return directory.canonicalFile
 	}
 
-	// canWrite() doesn't say what the filesystem really allows, so create a file
-	private fun canWriteTo(directory: File): Boolean = try {
-		File.createTempFile(".write_test", null, directory).delete()
-		true
-	} catch (e: IOException) {
-		false
-	} catch (e: SecurityException) {
-		false
+	// canWrite() doesn't say what the filesystem really allows, so write a file
+	private fun canWriteTo(directory: File): Boolean {
+		var probe: File? = null
+
+		return try {
+			probe = File.createTempFile(".write_test", null, directory)
+			probe.writeBytes(ByteArray(1))
+			true
+		} catch (e: IOException) {
+			false
+		} catch (e: SecurityException) {
+			false
+		} finally {
+			if (probe != null && !probe.delete())
+				Log.w(TAG, "Failed to delete ${probe.path}")
+		}
 	}
 
 	private fun hasStorageAccess(context: Context): Boolean {
