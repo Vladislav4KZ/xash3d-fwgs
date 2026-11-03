@@ -54,6 +54,7 @@ def main():
 	parser.add_argument("--ndk-version")
 	parser.add_argument("--min-sdk-version")
 	parser.add_argument("--ndk-root")
+	parser.add_argument("--sdl3", action="store_true")
 
 	args, unknown = parser.parse_known_args()
 
@@ -62,9 +63,9 @@ def main():
 	cmake_build_type = "Debug" if args.variant in ["debug", "asan"] else "Release"
 	cmake_toolchain_path = os.path.join(args.ndk_root, "build", "cmake", "android.toolchain.cmake")
 
-	# configure SDL2
+	# configure SDL, remove 3rdparty/SDL when switching between SDL2 and SDL3
 	sdl_path = os.path.join(args.wscript_path, "3rdparty", "SDL")
-	check_repo("SDL", "release-2.32.8", "https://github.com/libsdl-org/SDL", sdl_path)
+	check_repo("SDL", "release-3.2.x" if args.sdl3 else "release-2.32.8", "https://github.com/libsdl-org/SDL", sdl_path)
 
 	sdl_out_path = os.path.join(args.configuration_dir, "SDL")
 
@@ -103,6 +104,9 @@ def main():
 	waf_exec = [sys.executable, waf_path, "configure", "-t", args.wscript_path, "-o", out_path,
 				"-T", waf_build_type, "--android={},,{}".format(abi, args.min_sdk_version), "-s",
 				sdl_path, "--skip-sdl2-sanity-check", "--enable-bundled-deps"]
+
+	if args.sdl3:
+		waf_exec += ["-3"]
 
 	# optional prebuilt ffmpeg from FWGS/FFmpeg-Builds
 	ffmpeg_path = os.path.join(args.wscript_path, "3rdparty", "ffmpeg", abi)

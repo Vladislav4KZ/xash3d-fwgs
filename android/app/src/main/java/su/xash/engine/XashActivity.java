@@ -92,7 +92,7 @@ public class XashActivity extends SDLActivity {
 
 	@Override
 	protected String[] getLibraries() {
-		return new String[]{"SDL2", "xash"};
+		return new String[]{BuildConfig.USE_SDL3 ? "SDL3" : "SDL2", "xash"};
 	}
 
 	@SuppressLint("HardwareIds")

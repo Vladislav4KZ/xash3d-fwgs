@@ -22,7 +22,11 @@ GNU General Public License for more details.
 
 #include <android/log.h>
 #include <jni.h>
-#if XASH_SDL
+#if XASH_SDL == 3
+#include <SDL3/SDL.h>
+#define SDL_AndroidGetJNIEnv SDL_GetAndroidJNIEnv
+#define SDL_AndroidGetActivity SDL_GetAndroidActivity
+#elif XASH_SDL
 #include <SDL.h>
 #endif // XASH_SDL
 

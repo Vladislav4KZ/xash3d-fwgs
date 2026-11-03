@@ -18,7 +18,11 @@ GNU General Public License for more details.
 #include "common.h"
 
 #if XASH_SDLMAIN
+#if XASH_SDL == 3
+#include <SDL3/SDL_main.h>
+#else
 #include <SDL.h>
+#endif
 #endif
 
 #ifndef XASH_GAMEDIR

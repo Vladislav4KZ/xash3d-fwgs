@@ -22,6 +22,10 @@ extensions.configure<ApplicationExtension> {
 
 		buildConfigField("String", "GIT_HASH", "\"${getGitHash()}\"")
 
+		// build with SDL3: ./gradlew assembleDebug -Psdl3
+		val useSdl3 = project.hasProperty("sdl3")
+		buildConfigField("boolean", "USE_SDL3", useSdl3.toString())
+
 		externalNativeBuild {
 			val engineRoot = projectDir.parentFile.parent
 
@@ -40,7 +44,7 @@ extensions.configure<ApplicationExtension> {
 				// shut up, fake options
 				"-p:Configuration=\${ndk.variantName}",
 				"-p:Platform=\${ndk.abi}"
-			)
+			) + (if (useSdl3) setOf("--sdl3") else emptySet())
 		}
 	}
 
