@@ -42,6 +42,7 @@
 }
 
 -keep,includedescriptorclasses,allowoptimization class org.libsdl.app.SDLActivity {
+    void onNativeFileDialog(int, java.lang.String[], int);
     java.lang.String nativeGetHint(java.lang.String); # Java-side doesn't use this, so it gets minified, but C-side still tries to register it
     boolean onNativeSoftReturnKey();
     void onNativeKeyboardFocusLost();
