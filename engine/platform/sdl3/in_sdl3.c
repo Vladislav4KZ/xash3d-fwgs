@@ -205,6 +205,10 @@ int Platform_TranslateKeyLayout( int keynum )
 	return keynum;
 }
 
+#if XASH_ANDROID
+static SDL_Rect last_rect;
+#endif
+
 void Platform_EnableTextInput( qboolean enable, int x, int y, int w, int h )
 {
 	if( !enable )
@@ -221,6 +225,14 @@ void Platform_EnableTextInput( qboolean enable, int x, int y, int w, int h )
 		.w = w / scale_x,
 		.h = h / scale_y,
 	};
+
+#if XASH_ANDROID
+	// SDL3 doesn't notice the keyboard was closed, restart on the same rect to show it
+	if( SDL_TextInputActive( host.hWnd ) && !memcmp( &rect, &last_rect, sizeof( rect )))
+		SDL_StopTextInput( host.hWnd );
+
+	last_rect = rect;
+#endif
 
 	// Android reads the rect when the on-screen keyboard is shown, so set it before starting
 	SDL_SetTextInputArea( host.hWnd, &rect, 0 );
