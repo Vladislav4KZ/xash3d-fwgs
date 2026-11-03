@@ -1011,6 +1011,28 @@ void Key_EnableTextInput( qboolean enable, qboolean force )
 }
 
 /*
+================
+Key_ReopenTextInput
+
+the user could close the system keyboard, tapping the text field must show it again
+================
+*/
+void Key_ReopenTextInput( int x, int y )
+{
+	int rx, ry, rw, rh;
+
+	if( osk_enable.value || !host.textmode )
+		return;
+
+	Key_GetTextInputRect( &rx, &ry, &rw, &rh );
+
+	if( x < rx || x >= rx + rw || y < ry || y >= ry + rh )
+		return;
+
+	Key_EnableTextInput( true, true );
+}
+
+/*
 =========
 Key_SetKeyDest
 =========

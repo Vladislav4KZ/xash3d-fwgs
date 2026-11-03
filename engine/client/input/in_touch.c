@@ -2234,6 +2234,8 @@ static int Touch_ControlsEvent( touchEventType type, int fingerID, float x, floa
 	return true;
 }
 
+static qboolean touch_textmode;
+
 int IN_TouchEvent( touchEventType type, int fingerID, float x, float y, float dx, float dy )
 {
 	if( ref.rotation & 1 )
@@ -2327,6 +2329,10 @@ int IN_TouchEvent( touchEventType type, int fingerID, float x, float y, float dx
 				return 0;
 			}
 		}
+		// text input was already on before this tap
+		if( type == event_down )
+			touch_textmode = host.textmode;
+
 		UI_MouseMove( x * refState.width, y * refState.height );
 
 		//MsgDev( D_NOTE, "touch %d %d\n", TO_SCRN_X(x), TO_SCRN_Y(y) );
@@ -2334,7 +2340,15 @@ int IN_TouchEvent( touchEventType type, int fingerID, float x, float y, float dx
 			Key_Event( K_MOUSE1, true );
 
 		if( type == event_up )
+		{
 			Key_Event( K_MOUSE1, false );
+
+			// the keyboard might be closed already, show it again
+			if( touch_textmode && cls.key_dest == key_menu )
+				Key_ReopenTextInput( x * refState.width, y * refState.height );
+
+			touch_textmode = false;
+		}
 
 		return 0;
 	}
