@@ -23,8 +23,13 @@ git clone --depth 1 --recursive https://github.com/FWGS/hlsdk-portable -b mobile
 
 echo "Download SDL"
 pushd 3rdparty || exit 1
-wget "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VERSION/SDL2-$SDL_VERSION.tar.gz" -qO- | tar -xzf - || exit 1
-mv "SDL2-$SDL_VERSION" SDL
+if [ "$GH_SDL3" == "true" ]; then
+	wget "https://github.com/libsdl-org/SDL/releases/download/release-$SDL3_VERSION/SDL3-$SDL3_VERSION.tar.gz" -qO- | tar -xzf - || exit 1
+	mv "SDL3-$SDL3_VERSION" SDL
+else
+	wget "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VERSION/SDL2-$SDL_VERSION.tar.gz" -qO- | tar -xzf - || exit 1
+	mv "SDL2-$SDL_VERSION" SDL
+fi
 popd || exit 1
 
 echo "Download FFmpeg"
