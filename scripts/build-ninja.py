@@ -70,7 +70,9 @@ def main():
 		if not os.path.exists(inst_path):
 			os.makedirs(inst_path)
 
-		run_cmake(sdl_bin_path, ["libSDL2.so"], inst_path)
+		sdl_include = os.path.join(args.top_dir, "3rdparty", "SDL", "include")
+		sdl_lib = "libSDL3.so" if os.path.isdir(os.path.join(sdl_include, "SDL3")) else "libSDL2.so"
+		run_cmake(sdl_bin_path, [sdl_lib], inst_path)
 		run_cmake(hlsdk_bin_path, None, inst_path)
 		run_cmake(mainui_bin_path, None, inst_path)
 
