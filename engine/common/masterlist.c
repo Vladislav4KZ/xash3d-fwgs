@@ -42,7 +42,6 @@ typedef struct masterstatic_s
 	char base[];
 } masterstatic_t;
 
-#define MASTER_SERVER_QUERY_BUCKETS 256
 #define MASTER_SERVER_QUERY_TIMEOUT 10.0
 
 typedef struct server_list_query_s
@@ -53,8 +52,7 @@ typedef struct server_list_query_s
 	qboolean challenged;
 } server_list_query_t;
 
-static server_list_query_t *server_list_queries[MASTER_SERVER_QUERY_BUCKETS];
-static double server_list_query_cleanup_time;
+static server_list_query_t *server_list_queries;
 
 static struct masterlist_s
 {
@@ -69,105 +67,73 @@ static CVAR_DEFINE_AUTO( sv_verbose_heartbeats, "0", 0, "print every heartbeat t
 #define RESOLVE_EXPIRE_SECONDS          (60.0f)  // positive cache: 1 minute
 #define NEGATIVE_RESOLVE_EXPIRE_SECONDS (300.0f) // negative cache: 5 minutes
 
-static uint NET_ServerListQueryHash( netadr_t adr )
-{
-	const char *text = NET_AdrToString( adr );
-	uint hash = 5381;
-
-	while( *text )
-		hash = (( hash << 5 ) + hash ) ^ (byte)*text++;
-
-	return hash & ( MASTER_SERVER_QUERY_BUCKETS - 1 );
-}
-
 static void NET_PruneServerListQueries( void )
 {
-	if( host.realtime < server_list_query_cleanup_time )
-		return;
+	server_list_query_t **link = &server_list_queries;
 
-	server_list_query_cleanup_time = host.realtime + 1.0;
-
-	for( int i = 0; i < ARRAYSIZE( server_list_queries ); i++ )
+	while( *link )
 	{
-		server_list_query_t **link = &server_list_queries[i];
+		server_list_query_t *query = *link;
 
-		while( *link )
+		if( query->expire_time > host.realtime )
 		{
-			server_list_query_t *query = *link;
-
-			if( query->expire_time > host.realtime )
-			{
-				link = &query->next;
-				continue;
-			}
-
-			*link = query->next;
-			Mem_Free( query );
+			link = &query->next;
+			continue;
 		}
+
+		*link = query->next;
+		Mem_Free( query );
 	}
+}
+
+static server_list_query_t *NET_FindServerListQuery( netadr_t adr )
+{
+	for( server_list_query_t *query = server_list_queries; query; query = query->next )
+	{
+		if( NET_CompareAdr( query->adr, adr ))
+			return query;
+	}
+
+	return NULL;
 }
 
 static void NET_TrackServerListQuery( netadr_t adr )
 {
 	NET_PruneServerListQueries();
 
-	uint bucket = NET_ServerListQueryHash( adr );
-	server_list_query_t *query;
+	server_list_query_t *query = NET_FindServerListQuery( adr );
 
-	for( query = server_list_queries[bucket]; query; query = query->next )
+	if( !query )
 	{
-		if( !NET_CompareAdr( query->adr, adr ))
-			continue;
-
-		query->expire_time = host.realtime + MASTER_SERVER_QUERY_TIMEOUT;
-		query->challenged = false;
-		return;
+		query = Mem_Calloc( host.mempool, sizeof( *query ));
+		query->adr = adr;
+		query->next = server_list_queries;
+		server_list_queries = query;
 	}
 
-	query = Mem_Calloc( host.mempool, sizeof( *query ));
-	query->adr = adr;
 	query->expire_time = host.realtime + MASTER_SERVER_QUERY_TIMEOUT;
-	query->next = server_list_queries[bucket];
-	server_list_queries[bucket] = query;
+	query->challenged = false;
 }
 
-qboolean NET_ServerListQueryChallenge( netadr_t from, sizebuf_t *msg )
+void NET_ServerListQueryChallenge( netadr_t from, int challenge )
 {
 	byte buf[64];
-	sizebuf_t out;
-	server_list_query_t *query;
-	uint bucket;
-	int challenge;
-
-	if( MSG_GetMaxBytes( msg ) < sizeof( uint32_t ) + sizeof( uint8_t ) + sizeof( uint32_t ))
-		return false;
+	sizebuf_t msg;
 
 	NET_PruneServerListQueries();
-	bucket = NET_ServerListQueryHash( from );
 
-	for( query = server_list_queries[bucket]; query; query = query->next )
-	{
-		if( !NET_CompareAdr( query->adr, from ))
-			continue;
+	server_list_query_t *query = NET_FindServerListQuery( from );
 
-		if( query->challenged )
-			return true; // ignore duplicate challenge packets
+	// not queried by us or already answered
+	if( !query || query->challenged )
+		return;
 
-		MSG_SeekToBit( msg, ( sizeof( uint32_t ) + sizeof( uint8_t )) << 3, SEEK_SET );
-		challenge = MSG_ReadLong( msg );
-		if( MSG_CheckOverflow( msg ))
-			return false;
+	query->challenged = true;
 
-		query->challenged = true;
-
-		MSG_Init( &out, "ServerQuery", buf, sizeof( buf ));
-		MSG_WriteString( &out, A2S_GOLDSRC_INFO );
-		MSG_WriteLong( &out, challenge );
-		Netchan_OutOfBand( NS_CLIENT, query->adr, MSG_GetNumBytesWritten( &out ), MSG_GetData( &out ));
-		return true;
-	}
-
-	return false;
+	MSG_Init( &msg, "ServerQuery", buf, sizeof( buf ));
+	MSG_WriteString( &msg, A2S_GOLDSRC_INFO );
+	MSG_WriteLong( &msg, challenge );
+	Netchan_OutOfBand( NS_CLIENT, from, MSG_GetNumBytesWritten( &msg ), MSG_GetData( &msg ));
 }
 
 static size_t NET_BuildMasterServerScanRequest( char *buf, size_t size, uint32_t key, qboolean nat, const char *filter, connprotocol_t proto )

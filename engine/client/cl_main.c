@@ -2327,8 +2327,12 @@ static void CL_NetRequestChallenge( netadr_t from, sizebuf_t *msg )
 	MSG_SeekToBit( msg, ( sizeof( uint32_t ) + sizeof( uint8_t )) << 3, SEEK_SET );
 	int challenge = MSG_ReadLong( msg );
 
+	if( MSG_CheckOverflow( msg ))
+		return;
+
 	// give the challenge to the first request without one,
-	// the server sends a challenge per received query
+	// the server sends a challenge per received query;
+	// NetAPI goes first as challenge doesn't say who it's for
 	for( int i = 0; i < ARRAYSIZE( clgame.net_requests ); i++ )
 	{
 		net_request_t *nr = &clgame.net_requests[i];
@@ -2347,7 +2351,7 @@ static void CL_NetRequestChallenge( netadr_t from, sizebuf_t *msg )
 		return;
 	}
 
-	NET_ServerListQueryChallenge( from, msg );
+	NET_ServerListQueryChallenge( from, challenge );
 }
 
 /*
