@@ -2344,8 +2344,10 @@ static void CL_NetRequestChallenge( netadr_t from, sizebuf_t *msg )
 
 		nr->challenge = challenge;
 		CL_NetRequestSend( nr );
-		break;
+		return;
 	}
+
+	NET_ServerListQueryChallenge( from, msg );
 }
 
 /*
